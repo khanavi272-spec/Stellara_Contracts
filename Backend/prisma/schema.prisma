@@ -383,15 +383,6 @@ model EncryptionAuditLog {
   @@map("encryption_audit_logs")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 model Tenant {
   id        String       @id @default(uuid())
   slug      String       @unique
@@ -562,8 +553,6 @@ enum TenantRole {
   OWNER
   ADMIN
   MEMBER
-}
-
 }
 
 // ─── Centralized Config Management ───────────────────────────────────────────

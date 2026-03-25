@@ -1,10 +1,19 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsNumber, IsString, validateSync } from 'class-validator';
+import { IsEnum, IsNumber, IsString, IsOptional, IsBoolean, validateSync } from 'class-validator';
 
 enum Environment {
   Development = 'development',
   Production = 'production',
   Test = 'test',
+}
+
+enum LogLevel {
+  Trace = 'trace',
+  Debug = 'debug',
+  Info = 'info',
+  Warn = 'warn',
+  Error = 'error',
+  Fatal = 'fatal',
 }
 
 class EnvironmentVariables {
@@ -67,6 +76,27 @@ class EnvironmentVariables {
 
   @IsNumber()
   INDEXER_REORG_DEPTH_THRESHOLD: number;
+
+  // Logging Configuration
+  @IsOptional()
+  @IsEnum(LogLevel)
+  LOG_LEVEL?: LogLevel;
+
+  @IsOptional()
+  @IsBoolean()
+  LOG_PRETTY_PRINT?: boolean;
+
+  @IsOptional()
+  @IsString()
+  SERVICE_NAME?: string;
+
+  @IsOptional()
+  @IsString()
+  LOG_FORMAT?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  LOG_INCLUDE_CONTEXT?: boolean;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
