@@ -29,14 +29,14 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   async handleConnection(client: Socket) {
     const userId = client.handshake.query?.userId as string;
     if (userId) {
-      this.connectionState.register(userId, client.id, 'messages');
+      await this.connectionState.register(userId, client.id, 'messages');
       // Auto-join personal room
       await client.join(`user:${userId}`);
     }
   }
 
-  handleDisconnect(client: Socket) {
-    this.connectionState.unregister(client.id);
+  async handleDisconnect(client: Socket) {
+    await this.connectionState.unregister(client.id);
   }
 
   /** Join a named chat room */

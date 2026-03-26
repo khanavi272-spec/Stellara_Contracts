@@ -35,8 +35,8 @@ export class TradesGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  handleDisconnect(client: Socket) {
-    this.connectionState.unregister(client.id);
+  async handleDisconnect(client: Socket) {
+    await this.connectionState.unregister(client.id);
   }
 
   /** Subscribe to trade updates for a specific asset pair */

@@ -31,15 +31,15 @@ export class PricesGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Auth is handled per-message via guard, but we can do a lightweight check here
       const userId = client.handshake.query?.userId as string;
       if (userId) {
-        this.connectionState.register(userId, client.id, 'prices');
+        await this.connectionState.register(userId, client.id, 'prices');
       }
     } catch {
       client.disconnect();
     }
   }
 
-  handleDisconnect(client: Socket) {
-    this.connectionState.unregister(client.id);
+  async handleDisconnect(client: Socket) {
+    await this.connectionState.unregister(client.id);
   }
 
   /** Subscribe to price updates for a specific asset (e.g. "XLM-USDC") */

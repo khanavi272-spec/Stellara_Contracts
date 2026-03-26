@@ -7,9 +7,9 @@ import { ApplicationStateService } from './lifecycle/application-state.service';
 import { AuditInterceptor } from './audit';
 import { ConfigService } from '@nestjs/config';
 import { InflightRequestMiddleware } from './lifecycle/inflight-request.middleware';
-import { IoAdapter } from '@nestjs/platform-socket.io';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { NestFactory } from '@nestjs/core';
+import { RedisIoAdapter } from './websocket/adapters/redis-io.adapter';
 import { TenantQuotaMiddleware } from './quota/tenant-quota.middleware';
 import { UserThrottlerGuard } from './common/guards/user-throttler.guard';
 import { ValidationPipe } from '@nestjs/common';
@@ -63,7 +63,9 @@ async function bootstrap() {
   app.use(correlationIdMiddleware.use.bind(correlationIdMiddleware));
 
   // WebSocket adapter
-  app.useWebSocketAdapter(new IoAdapter(app));
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   // CORS
   app.enableCors({
