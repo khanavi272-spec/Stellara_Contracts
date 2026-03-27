@@ -1,0 +1,26 @@
+{
+  "name": "stellara-load-tests",
+  "version": "1.0.0",
+  "description": "Load testing and performance benchmarking for Stellara platform",
+  "scripts": {
+    "test:load:auth": "k6 run tests/load/auth-flow-test.js",
+    "test:load:trading": "k6 run tests/load/trading-api-test.js",
+    "test:load:query": "k6 run tests/load/query-api-test.js",
+    "test:load:compliance": "k6 run tests/load/compliance-api-test.js",
+    "test:load:feature-flags": "k6 run tests/load/feature-flags-test.js",
+    "test:load:all": "k6 run tests/load/auth-flow-test.js && k6 run tests/load/trading-api-test.js && k6 run tests/load/query-api-test.js && k6 run tests/load/compliance-api-test.js && k6 run tests/load/feature-flags-test.js",
+    "test:load:smoke": "k6 run --vus 10 --duration 30s tests/load/auth-flow-test.js",
+    "test:load:stress": "k6 run --vus 2000 --duration 10m tests/load/trading-api-test.js",
+    "test:load:spike": "k6 run --execution-type=constant-vus --vus=50 --duration=2m --execution-type=ramping-vus --stages='[{\"duration\":\"30s\",\"target\":1000},{\"duration\":\"1m\",\"target\":1000},{\"duration\":\"30s\",\"target\":50}]' tests/load/query-api-test.js",
+    "test:load:soak": "k6 run --vus 100 --duration 2h tests/load/feature-flags-test.js",
+    "test:benchmark:setup": "npm run test:load:smoke",
+    "test:benchmark:baseline": "k6 run --vus 100 --duration 5m tests/load/trading-api-test.js --out json=baseline-results.json",
+    "test:benchmark:compare": "k6 run --vus 100 --duration 5m tests/load/trading-api-test.js --out json=current-results.json && node scripts/compare-results.js baseline-results.json current-results.json"
+  },
+  "devDependencies": {
+    "k6": "^0.49.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
