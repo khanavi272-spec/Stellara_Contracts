@@ -41,6 +41,11 @@ import { SearchModule } from './search/search.module';
 import { AdminModule } from './admin/admin.module';
 import { DataExportModule } from './data-export/data-export.module';
 import { ExportJob } from './data-export/entities/export-job.entity';
+import { ComplianceModule } from './compliance/compliance.module';
+import { KycVerification } from './compliance/entities/kyc-verification.entity';
+import { ComplianceReport } from './compliance/entities/compliance-report.entity';
+import { SanctionsCheck } from './compliance/entities/sanctions-check.entity';
+import { RiskAssessment } from './compliance/entities/risk-assessment.entity';
 
 
 @Module({
@@ -77,6 +82,10 @@ import { ExportJob } from './data-export/entities/export-job.entity';
           TransactionRecord,
           ContractMetadata,
           ExportJob,
+          KycVerification,
+          ComplianceReport,
+          SanctionsCheck,
+          RiskAssessment,
         ],
         synchronize: configService.get('NODE_ENV') === 'development',
         logging: configService.get('NODE_ENV') === 'development',
@@ -97,6 +106,7 @@ import { ExportJob } from './data-export/entities/export-job.entity';
     SearchModule,
     AdminModule,
     DataExportModule,
+    ComplianceModule,
   ],
 
   controllers: [AppController],
