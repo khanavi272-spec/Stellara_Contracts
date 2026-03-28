@@ -31,7 +31,7 @@
           "function": {
             "contract_fn": {
               "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "trade_batch",
+              "function_name": "batch_trade",
               "args": [
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
@@ -1330,7 +1330,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "trade_batch"
+                "symbol": "batch_trade"
               }
             ],
             "data": {
@@ -1760,7 +1760,7 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "trade_batch"
+                "symbol": "batch_trade"
               }
             ],
             "data": {

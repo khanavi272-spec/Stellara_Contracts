@@ -305,7 +305,7 @@ impl GasBenchmark {
         env.budget().reset_default();
 
         // Execute batch trade
-        let _ = client.trade_batch(&trader, &orders, &token_id, &0i128, &fee_recipient);
+        let _ = client.batch_trade(&trader, &orders, &token_id, &0i128, &fee_recipient);
 
         // Get measurements
         let cpu_insns = env.budget().cpu_instruction_cost();

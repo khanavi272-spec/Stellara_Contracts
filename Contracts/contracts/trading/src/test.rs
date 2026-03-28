@@ -541,7 +541,7 @@ fn test_optimized_storage_scaling() {
     assert_eq!(trade_10.unwrap().id, 10);
 }
 
-// ============ NEW OPTIMIZATION TESTS ============
+// ============ BATCH OPERATION TESTS ============
 
 #[test]
 fn test_batch_trade_execution() {
@@ -562,7 +562,7 @@ fn test_batch_trade_execution() {
     orders.push_back((symbol_short!("BTCUSD"), 200_000i128, 49_500i128, false));
 
     // Execute batch trade
-    let trade_ids = client.trade_batch(&trader, &orders, &token_id, &0i128, &fee_recipient);
+    let trade_ids = client.batch_trade(&trader, &orders, &token_id, &0i128, &fee_recipient);
 
     assert_eq!(trade_ids.len(), 3);
     assert_eq!(trade_ids.get(0).unwrap(), 1);
@@ -589,7 +589,7 @@ fn test_batch_trade_empty_orders() {
 
     let orders = Vec::new(&env);
 
-    let trade_ids = client.trade_batch(&trader, &orders, &token_id, &0i128, &fee_recipient);
+    let trade_ids = client.batch_trade(&trader, &orders, &token_id, &0i128, &fee_recipient);
 
     assert_eq!(trade_ids.len(), 0);
 }
@@ -610,9 +610,59 @@ fn test_batch_trade_invalid_amount() {
     orders.push_back((symbol_short!("BTCUSD"), 1_000_000i128, 50_000i128, true));
     orders.push_back((symbol_short!("ETHUSD"), -500_000i128, 3_000i128, true)); // Invalid
 
-    let result = client.try_trade_batch(&trader, &orders, &token_id, &0i128, &fee_recipient);
+    let result = client.try_batch_trade(&trader, &orders, &token_id, &0i128, &fee_recipient);
 
     assert!(result.is_err());
+    let stats = client.get_stats();
+    assert_eq!(stats.total_trades, 0);
+    assert_eq!(stats.total_volume, 0);
+}
+
+#[test]
+fn test_batch_trade_rejects_oversized_batch() {
+    let env = Env::default();
+    env.ledger().with_mut(|li| li.timestamp = 1000);
+    env.mock_all_auths();
+
+    let (client, _admin, _approver, _executor) = setup_contract(&env);
+
+    let trader = Address::generate(&env);
+    let fee_recipient = Address::generate(&env);
+    let token_id = env.register_stellar_asset_contract(fee_recipient.clone());
+
+    let mut orders = Vec::new(&env);
+    for i in 0..client.max_batch_size() + 1 {
+        orders.push_back((symbol_short!("BTCUSD"), 1000 + i as i128, 50_000i128, true));
+    }
+
+    let result = client.try_batch_trade(&trader, &orders, &token_id, &0i128, &fee_recipient);
+
+    assert!(result.is_err());
+    let stats = client.get_stats();
+    assert_eq!(stats.total_trades, 0);
+}
+
+#[test]
+fn test_trade_batch_alias_matches_batch_trade() {
+    let env = Env::default();
+    env.ledger().with_mut(|li| li.timestamp = 1000);
+    env.mock_all_auths();
+
+    let (client, _admin, _approver, _executor) = setup_contract(&env);
+
+    let trader = Address::generate(&env);
+    let fee_recipient = Address::generate(&env);
+    let token_id = env.register_stellar_asset_contract(fee_recipient.clone());
+
+    let orders = vec![
+        &env,
+        (symbol_short!("BTCUSD"), 1_000_000i128, 50_000i128, true),
+        (symbol_short!("ETHUSD"), 500_000i128, 3_000i128, true),
+    ];
+
+    let trade_ids = client.trade_batch(&trader, &orders, &token_id, &0i128, &fee_recipient);
+    assert_eq!(trade_ids.len(), 2);
+    assert_eq!(trade_ids.get(0).unwrap(), 1);
 }
 
 #[test]
@@ -641,7 +691,7 @@ fn test_batch_trade_gas_efficiency() {
             &fee_recipient,
         );
     }
-    let individual_cpu = env.budget().cpu_instruction_cost();
+    let _individual_cpu = env.budget().cpu_instruction_cost();
 
     // Reset contract for batch test
     let contract_id = env.register_contract(None, UpgradeableTradingContract);
@@ -666,15 +716,10 @@ fn test_batch_trade_gas_efficiency() {
         ));
     }
     client2.trade_batch(&trader, &orders, &token_id, &0i128, &fee_recipient);
-    let batch_cpu = env.budget().cpu_instruction_cost();
+    let _batch_cpu = env.budget().cpu_instruction_cost();
 
     // Batch should be more efficient (less than individual trades)
     // Note: This is a rough check, actual savings depend on implementation
-    #[cfg(feature = "std")]
-    {
-        println!("Individual trades CPU: {}", individual_cpu);
-        println!("Batch trade CPU: {}", batch_cpu);
-    }
 }
 
 #[test]
@@ -702,13 +747,8 @@ fn test_optimized_storage_access_pattern() {
         &fee_recipient,
     );
 
-    let cpu_cost = env.budget().cpu_instruction_cost();
-    let mem_cost = env.budget().memory_bytes_cost();
-
-    #[cfg(feature = "std")]
-    {
-        println!("Optimized trade - CPU: {}, MEM: {}", cpu_cost, mem_cost);
-    }
+    let _cpu_cost = env.budget().cpu_instruction_cost();
+    let _mem_cost = env.budget().memory_bytes_cost();
 
     // Verify trade executed correctly
     assert_eq!(trade_id, 1);
