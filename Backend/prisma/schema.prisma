@@ -1871,5 +1871,301 @@ enum SettlementJobStatus {
   FAILED
   CANCELLED
 }
+
+// ─── Universal Cross-Chain Router Models ──────────────────────────────────────
+
+enum SupportedBlockchain {
+  ETHEREUM
+  STELLAR
+  SOLANA
+  COSMOS
+  POLKADOT
+  AVALANCHE
+  ARBITRUM
+  OPTIMISM
+  POLYGON
+  BASE
+}
+
+enum MessageStatus {
+  INITIATED
+  LOCKED
+  VERIFIED
+  MINTED
+  BURNED
+  RELEASED
+  SLASHED
+  FAILED
+  REVERTED
+}
+
+enum RouterEventType {
+  MESSAGE_INITIATED
+  FINALITY_DETECTED
+  LIGHT_CLIENT_UPDATE
+  VALIDATOR_SLASH
+  ASSET_LOCKED
+  ASSET_RELEASED
+  VERIFICATION_SUCCESS
+  VERIFICATION_FAILED
+}
+
+enum ValidatorStatus {
+  ACTIVE
+  INACTIVE
+  SLASHED
+  EXITED
+}
+
+model ChainAdapter {
+  id                    String   @id @default(cuid())
+  blockchain            SupportedBlockchain @unique
+  rpcEndpoint           String   @map("rpc_endpoint")
+  wsEndpoint            String?  @map("ws_endpoint")
+  chainId               String   @map("chain_id")
+  explorerUrl           String?  @map("explorer_url")
+  isActive              Boolean  @default(true) @map("is_active")
+  finalityBlocks        Int      @default(12) @map("finality_blocks") // blocks until finality
+  avgBlockTime          Int      @default(12000) @map("avg_block_time") // ms
+  maxMessageSize        Int      @default(1024) @map("max_message_size")
+  messageGasLimit       String   @default("500000") @map("message_gas_limit")
+  heartbeatInterval     Int      @default(30000) @map("heartbeat_interval") // ms
+  lastHeartbeat         DateTime? @map("last_heartbeat")
+  isHealthy             Boolean  @default(true) @map("is_healthy")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  lightClients          LightClient[]
+  validators            Validator[]
+  messages              CrossChainMessage[]
+  bridgedAssets         BridgedAsset[]
+
+  @@map("chain_adapters")
+}
+
+model LightClient {
+  id                    String   @id @default(cuid())
+  chainId               String   @map("chain_id")
+  chainAdapter          ChainAdapter @relation(fields: [chainId], references: [chainId])
+  latestBlockNumber     BigInt   @map("latest_block_number")
+  latestBlockHash       String   @map("latest_block_hash")
+  latestBlockTime       DateTime @map("latest_block_time")
+  commitmentRoot        String   @map("commitment_root")
+  validatorSetRoot      String   @map("validator_set_root")
+  trustedBlockNumber    BigInt   @map("trusted_block_number")
+  verificationCount     Int      @default(0) @map("verification_count")
+  failureCount          Int      @default(0) @map("failure_count")
+  lastUpdateTime        DateTime @default(now()) @map("last_update_time")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  headerProofs          HeaderProof[]
+
+  @@unique([chainId])
+  @@index([chainId])
+  @@map("light_clients")
+}
+
+model HeaderProof {
+  id                    String   @id @default(cuid())
+  lightClientId         String   @map("light_client_id")
+  lightClient           LightClient @relation(fields: [lightClientId], references: [id])
+  blockNumber           BigInt   @map("block_number")
+  blockHash             String   @map("block_hash")
+  proof                 String   @db.Text // Merkle proof or light client proof
+  signerBitmap          String   @map("signer_bitmap") // bitmap of signing validators
+  threshold             Int      // number of validators that must sign
+  isVerified            Boolean  @default(false) @map("is_verified")
+  verificationTime      DateTime? @map("verification_time")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  @@index([lightClientId])
+  @@index([blockNumber])
+  @@map("header_proofs")
+}
+
+model CrossChainMessage {
+  id                    String   @id @default(cuid())
+  messageId             String   @unique @map("message_id") // Global message ID
+  sourceChain           String   @map("source_chain")
+  sourceAdapter         ChainAdapter @relation(fields: [sourceChain], references: [chainId])
+  destChain             String   @map("dest_chain")
+  senderAddress         String   @map("sender_address")
+  recipientAddress      String   @map("recipient_address")
+  messagePayload        String   @db.Text @map("message_payload") // JSON encoded
+  messageHash           String   @unique @map("message_hash")
+  status                MessageStatus @default(INITIATED)
+  nonce                 BigInt   // for ordering
+  sequenceNumber        BigInt   @map("sequence_number")
+  
+  // Lock-and-mint / burn-and-release tracking
+  assetSymbol           String?  @map("asset_symbol")
+  assetAmount           Decimal? @db.Decimal(36, 18) @map("asset_amount")
+  lockTxHash            String?  @map("lock_tx_hash")
+  releaseTxHash         String?  @map("release_tx_hash")
+  
+  // Execution tracking
+  gasUsed               Decimal? @db.Decimal(36, 18) @map("gas_used")
+  executionTime         Int?     @map("execution_time") // ms
+  errorMessage          String?  @map("error_message")
+  
+  // Support for arbitrary contract calls
+  contractAddress       String?  @map("contract_address")
+  functionSelector      String?  @map("function_selector")
+  functionArgs          String?  @db.Text @map("function_args") // JSON
+  
+  // Finality tracking
+  sourceFinalized       Boolean  @default(false) @map("source_finalized")
+  destFinalized         Boolean  @default(false) @map("dest_finalized")
+  sourceFinalizationBlockNumber BigInt? @map("source_finalization_block_number")
+  destFinalizationBlockNumber   BigInt? @map("dest_finalization_block_number")
+  
+  initiatedAt           DateTime @default(now()) @map("initiated_at")
+  lockedAt              DateTime? @map("locked_at")
+  verifiedAt            DateTime? @map("verified_at")
+  finalizedAt           DateTime? @map("finalized_at")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  receipts              MessageReceipt[]
+  routerEvents          RouterEvent[]
+
+  @@unique([sourceChain, destChain, messageId])
+  @@index([status])
+  @@index([sourceChain])
+  @@index([destChain])
+  @@index([senderAddress])
+  @@index([createdAt])
+  @@map("cross_chain_messages")
+}
+
+model MessageReceipt {
+  id                    String   @id @default(cuid())
+  messageId             String   @map("message_id")
+  message               CrossChainMessage @relation(fields: [messageId], references: [id])
+  chainId               String   @map("chain_id")
+  blockNumber           BigInt   @map("block_number")
+  blockHash             String   @map("block_hash")
+  transactionHash       String   @unique @map("transaction_hash")
+  logIndex              Int      @map("log_index")
+  isConfirmed           Boolean  @default(false) @map("is_confirmed")
+  confirmationCount     Int      @default(0) @map("confirmation_count")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  @@unique([messageId, chainId])
+  @@index([messageId])
+  @@index([chainId])
+  @@map("message_receipts")
+}
+
+model Validator {
+  id                    String   @id @default(cuid())
+  validatorAddress      String   @map("validator_address")
+  chainId               String   @map("chain_id")
+  chainAdapter          ChainAdapter @relation(fields: [chainId], references: [chainId])
+  stakedAmount          Decimal  @db.Decimal(36, 18) @map("staked_amount")
+  totalSlashed          Decimal  @default(0) @db.Decimal(36, 18) @map("total_slashed")
+  status                ValidatorStatus @default(ACTIVE)
+  joinedAt              DateTime @map("joined_at")
+  exitAmount            Decimal? @db.Decimal(36, 18) @map("exit_amount")
+  exitAt                DateTime? @map("exit_at")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  slashings             SlashingEvent[]
+
+  @@unique([chainId, validatorAddress])
+  @@index([chainId])
+  @@index([status])
+  @@map("validators")
+}
+
+model SlashingEvent {
+  id                    String   @id @default(cuid())
+  validatorId           String   @map("validator_id")
+  validator             Validator @relation(fields: [validatorId], references: [id])
+  slashAmount           Decimal  @db.Decimal(36, 18) @map("slash_amount")
+  reason                String   // e.g., "double_sign", "missed_attestation", "equivocation"
+  slashPercentage       Decimal  @db.Decimal(5, 2) @map("slash_percentage") // e.g., 10.5 for 10.5%
+  txHash                String?  @unique @map("tx_hash")
+  blockNumber           BigInt?  @map("block_number")
+  isExecuted            Boolean  @default(false) @map("is_executed")
+  executedAt            DateTime? @map("executed_at")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  @@index([validatorId])
+  @@index([createdAt])
+  @@map("slashing_events")
+}
+
+model BridgedAsset {
+  id                    String   @id @default(cuid())
+  assetSymbol           String   @map("asset_symbol")
+  sourceChain           String   @map("source_chain")
+  sourceAdapter         ChainAdapter @relation(fields: [sourceChain], references: [chainId])
+  sourceTokenAddress    String   @map("source_token_address")
+  totalLocked           Decimal  @default(0) @db.Decimal(36, 18) @map("total_locked")
+  totalMinted           Decimal  @default(0) @db.Decimal(36, 18) @map("total_minted")
+  decimals              Int      @default(18)
+  isActive              Boolean  @default(true) @map("is_active")
+  bridgeMode            String   @default("lock-and-mint") @map("bridge_mode") // lock-and-mint or burn-and-release
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@unique([assetSymbol, sourceChain])
+  @@index([sourceChain])
+  @@index([assetSymbol])
+  @@map("bridged_assets")
+}
+
+model CrossChainRoute {
+  id                    String   @id @default(cuid())
+  sourceChain           String   @map("source_chain")
+  destChain             String   @map("dest_chain")
+  isActive              Boolean  @default(true) @map("is_active")
+  fee                   Decimal  @db.Decimal(5, 4) @map("fee") // e.g., 0.005 for 0.5%
+  estimatedLatency      Int      @default(600000) @map("estimated_latency") // ms
+  successRate           Decimal  @default(100) @db.Decimal(5, 2) @map("success_rate") // percentage
+  messagesCount         Int      @default(0) @map("messages_count")
+  lastMessageTime       DateTime? @map("last_message_time")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@unique([sourceChain, destChain])
+  @@map("cross_chain_routes")
+}
+
+model RouterEvent {
+  id                    String   @id @default(cuid())
+  messageId             String   @map("message_id")
+  message               CrossChainMessage @relation(fields: [messageId], references: [id])
+  eventType             RouterEventType @map("event_type")
+  chainId               String   @map("chain_id")
+  blockNumber           BigInt?  @map("block_number")
+  txHash                String?  @map("tx_hash")
+  eventData             String   @db.Text @map("event_data") // JSON
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  @@index([messageId])
+  @@index([eventType])
+  @@index([chainId])
+  @@index([createdAt])
+  @@map("router_events")
+}
+
+model RouterStatus {
+  id                    String   @id @default(cuid())
+  chainId               String   @unique @map("chain_id")
+  isHealthy             Boolean  @default(true) @map("is_healthy")
+  avgLatency            Int      @default(0) @map("avg_latency") // ms
+  messageProcessingSpeed Decimal  @default(100) @db.Decimal(5, 2) @map("message_processing_speed") // % throughput
+  lastHealthCheck       DateTime @default(now()) @map("last_health_check")
+  errorCount            Int      @default(0) @map("error_count")
+  successCount          Int      @default(0) @map("success_count")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("router_status")
+}
 }
 
