@@ -71,7 +71,7 @@ import { AIAuditorModule } from './ai-auditor/ai-auditor.module';
 import { VoiceTradingModule } from './voice-trading/voice-trading.module';
 import { SyntheticAssetsModule } from './synthetic-assets/synthetic-assets.module';
 import { MLModelServingModule } from './ml-model-serving/ml-model-serving.module';
-
+import { SiemModule } from './siem/siem.module';
 
 @Module({
   imports: [
@@ -167,6 +167,7 @@ import { MLModelServingModule } from './ml-model-serving/ml-model-serving.module
     VoiceTradingModule,
     SyntheticAssetsModule,
     MLModelServingModule,
+    SiemModule,
 
   ],
   controllers: [AppController, UserController, DocsController],
